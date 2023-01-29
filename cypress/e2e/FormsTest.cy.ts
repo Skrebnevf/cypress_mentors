@@ -23,7 +23,14 @@ describe('template spec', { testIsolation: false }, () => {
     formsPage.typeUsingTheGridPassword('1234')
   })
 
-  it('passes', () => {
-    
+  it.only('Position Hover', () => {
+    cy.get('a.ng-tns-c7-7 > .menu-title').click();
+    cy.get('.ng-tns-c7-10 > .menu-title').click();
+    cy.wait(1000)
+    cy.get('[nbpopoverplacement="left"]').then($el => {
+      cy.wrap($el).click()
+      cy.contains('Hello, how are you today?')
+    })
+    cy.get('.nb-overlay-left').should('be.exist')
   })
 })

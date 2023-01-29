@@ -1,0 +1,1327 @@
+{% extends 'base.html.twig' %}
+{% set title = 'Edit order #'~order.orderNo %}
+{% block title %}{{ title }}{% endblock %}
+{% block stylesheets %}
+    {{ parent() }}
+    {{ encore_entry_link_tags('fileuploader') }}
+{% endblock %}
+{% block javascripts_footer %}
+    {{ encore_entry_script_tags('orders') }}
+    {{ encore_entry_script_tags('country_region') }}
+    {{ encore_entry_script_tags('customer') }}
+    {{ encore_entry_script_tags('table') }}
+    {{ encore_entry_script_tags('links') }}
+    {{ encore_entry_script_tags('fileuploader') }}
+    {{ encore_entry_script_tags('modalCarousel') }}
+    {{ encore_entry_script_tags('autocomplete') }}
+    {{ encore_entry_script_tags('commonProducts') }}
+    {{ encore_entry_script_tags('simple_form_enable') }}
+    {{ encore_entry_script_tags('daterange') }}
+{% endblock %}
+{% block body %}
+    {% set path_save = path('order_save', {'id': order.id }) %}
+    {% from "macros/action_menu.html.twig" import action_menu %}
+    {% from "macros/modal_carousel.html.twig" import modal_carousel %}
+    {% from 'macros/autocomplete.html.twig' import autocomplete, autocomplete_holder %}
+    {% from 'macros/daterange.html.twig' import daterange %}
+    {% from 'macros/utility.html.twig' import activeStatus %}
+    {% set roundSymbols = (order.delivery.deliverySum|slice(-5,1) == '.' ? 4 : 2) %}
+    {{
+        autocomplete_holder(
+            'product',
+            '.product',
+            []|json_encode,
+            productDataProvider.autocompleteOptions|json_encode,
+            0,
+            'addOrderProduct'
+        )
+    }}
+    <input type="hidden" name="export-date-allowed" value="{{ oneCExportDateAllowed is defined ? oneCExportDateAllowed : '' }}">
+    <div class="container-fluid {{ order.status.new ? 'border border-3 border-danger border-bottom-0' : '' }}">
+        {% if edit == false %}
+            {% set data = [{
+                "path" : path('order_edit', {orderNumber: order.orderNo}),
+                "caption" : "Edit",
+                "style" : "btn-success",
+                "target" : "_self",
+                "dataCy" : "edit-order"
+            }] %}
+        {% else %}
+            {% set data = [] %}
+        {% endif %}
+        {{
+            action_menu(
+                title ~' ( '~ order.createdAt|date('Y-m-d H:i')~' )',
+                (edit == true ? 'order' : false),
+                false,
+                (edit == true ? path_save : false),
+                false,
+                false,
+                data,
+                false,
+                false,
+                false,
+                path('order_view', {orderNumber: order.orderNo}),
+            )
+        }}
+        {% from 'macros/table.html.twig' import add_row, delete_row %}
+        {% from 'orders/order/macros/order_billing_address_edit_modal.html.twig' import edit_order_billing_address %}
+        {% from 'orders/order/macros/order_shipping_address_edit_modal.html.twig' import edit_order_shipping_address %}
+        {{ edit_order_billing_address(order, 'en') }}
+        {{ edit_order_shipping_address(order) }}
+        <div class="row">
+            <div class="col-1">
+                <div id="product_navs" class="nav flex-column nav-pills text-left" data-cy="order_nav_menu" role="tablist"
+                     aria-orientation="vertical">
+                    <a id="nav-order" class="menu_link product_edit nav-link active link loadSection"
+                       data-section="home" data-cy="order_nav">Order</a>
+                    <a id="nav-return" class="menu_link product_edit nav-link" data-cy="order_nav_returns" data-order="">Returns</a>
+                    <a id="nav-refund" class="menu_link product_edit nav-link" data-cy="order_nav_fefounds" data-order="">Refunds</a>
+                    <a id="nav-payments" class="menu_link product_edit nav-link link loadSection"
+                       data-section="payments" data-cy="order_nav_payments" data-order="{{ order.id }}">Payments</a>
+                    <a id="nav-payments" class="menu_link product_edit nav-link" data-cy="order_nav_logs" data-order="">Logs</a>
+                </div>
+            </div>
+            {# MAIN AREA #}
+            <div class="col-11">
+                {% if edit == true %}
+                <form id="form_order" data-cy="form_order_main" method="post" action="{{ path_save }}" data-on-success="{{ path('order_edit', {orderNumber: order.orderNo}) }}">
+                {% endif %}
+                    <div id="sectionContent">
+                        <div class="container-fluid">
+                            {% if order.manager or order.poNumber != "" or order.externalOrder %}
+                            <div class="row">
+                                <div class="col-12">
+                                    <div class="card mb-1">
+                                        <div class="card-body p-2">
+                                            <div class="row">
+                                                <div class="col-3">
+                                                    {% if order.poNumber != "" %}
+                                                    <div class="row">
+                                                        <div class="col-4 h5 d-flex align-self-center">Reference</div>
+                                                        <div class="col-8">
+                                                            {% if edit == true %}
+                                                                <input type="text" name="poNumber"
+                                                                       value="{{ order.poNumber }}"
+                                                                       class="form-control form-control-sm"
+                                                                >
+                                                            {% else %}
+                                                                <span class="h5">#{{ order.poNumber }}</span>
+                                                            {% endif %}
+                                                        </div>
+                                                    </div>
+                                                    {% endif %}
+                                                </div>
+                                                <div class="col-3">
+                                                    {% if order.externalOrder %}
+                                                    <div class="row">
+                                                        <div class="col-4 h5 d-flex align-self-center">#{{ order.salesChannel.uid|capitalize }}</div>
+                                                        <div class="col-8 h5">
+                                                            {% if edit == true %}
+                                                                <input type="text" name="externalOrderId"
+                                                                       value="{{ order.externalOrder.orderId }}"
+                                                                       class="form-control form-control-sm"
+                                                                >
+                                                            {% else %}
+                                                                {{ order.externalOrder.orderId }}
+                                                            {% endif %}
+                                                        </div>
+                                                    </div>
+                                                    {% endif %}
+                                                </div>
+                                                <div class="col-4"></div>
+                                                <div class="col-2 text-right">
+                                                    {% if order.manager %}
+                                                        <span class="h5">Created by: {{ order.manager.fullName }}</span>
+                                                    {% endif %}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endif %}
+                            <div class="row">
+                                {# LEFT SIDE #}
+                                <div class="col-12">
+                                    <div class="card">
+                                        <div class="card-body">
+                                            <div class="row">
+                                                <div class="col-3">
+                                                    <div class="row form-group">
+                                                        <div class="col-4">Status ( <a href="{{ path('order_status_log', {'orderNumber':order.orderNo}) }}">log</a> )</div>
+                                                        <div class="col-8"  data-cy="status_id">
+                                                            {% if edit == true %}
+                                                                <input type="hidden" id="orderId" data-cy="orderID_hiden" value="{{ order.id }}">
+                                                                <input type="hidden" id="currencyUid" data-cy="currencyID_hiden" value="{{ order.currency.uid3 }}">
+                                                                <select name="statusId" data-cy="order_status"
+                                                                        class="form-control form-control-sm">
+                                                                    {% for orderStatus in orderStatuses %}
+                                                                        <option value="{{ orderStatus.id }}"
+                                                                                {{ order.status.id == orderStatus.id ? ' selected="selected" ' }}
+                                                                        >
+                                                                            {{ orderStatus.name.en }}
+                                                                        </option>
+                                                                    {% endfor %}
+                                                                </select>
+                                                            {% else %}
+                                                                {{ order.status.name.en }}
+                                                            {% endif %}
+                                                        </div>
+                                                    </div>
+                                                    <div class="row form-group">
+                                                        <div class="col-4">Payment Method</div>
+                                                        <div class="col-8">
+                                                            {% if edit == true %}
+                                                                <select name="paymentMethodId" data-cy="payment_method"
+                                                                        class="form-control form-control-sm">
+                                                                    <option></option>
+                                                                    {% for paymentMethod in paymentMethods %}
+                                                                        <option value="{{ paymentMethod.id }}"
+                                                                                {{ order.paymentMethod and order.paymentMethod.id == paymentMethod.id ? ' selected="selected" ' }}
+                                                                        >
+                                                                            {{ paymentMethod.dStringName.en }}
+                                                                        </option>
+                                                                    {% endfor %}
+                                                                </select>
+                                                            {% else %}
+                                                                {{ order.paymentMethod ? order.paymentMethod.dStringName.en : '' }}
+                                                            {% endif %}
+                                                        </div>
+                                                    </div>
+                                                    <div class="row form-group">
+                                                        <div class="col-4">Bank account</div>
+                                                        <div class="col-8">
+                                                            {% if edit == true %}
+                                                                <select name="bankAccountId" data-cy="bank_account"
+                                                                        class="form-control form-control-sm">
+                                                                    <option></option>
+                                                                    {% for bankAccount in bankAccounts %}
+                                                                        <option value="{{ bankAccount.id }}"
+                                                                                {{ order.bankAccount and order.bankAccount.id == bankAccount.id ? ' selected="selected" ' }}
+                                                                        >{{ bankAccount.name }}</option>
+                                                                    {% endfor %}
+                                                                </select>
+                                                            {% else %}
+                                                                {{ order.bankAccount.name | default('') }}
+                                                            {% endif %}
+                                                        </div>
+                                                    </div>
+                                                    <div class="row form-group">
+                                                        <div class="col-4">Payment terms</div>
+                                                        <div class="col-8">
+                                                            {% if edit == true %}
+                                                            <select class="form-control" name="paymentTerm" data-cy="payment_term">
+                                                                <option value="0">pre-payment</option>
+                                                                {% for term in terms %}
+                                                                    <option value="{{ term.id }}"
+                                                                            {% if (order.paymentTerm) and (term.id == order.paymentTerm.id) %} selected {% endif %}
+                                                                    >
+                                                                        {{ term.days }} days
+                                                                    </option>
+                                                                {% endfor %}
+                                                            </select>
+                                                            {% elseif order.paymentTerm %}
+                                                                {{ order.paymentTerm.days }} days
+                                                            {% else %}
+                                                                pre-payment
+                                                            {% endif %}
+                                                        </div>
+                                                    </div>
+                                                    <div class="row form-group">
+                                                        <div class="col-4">Sales Channel</div>
+                                                        <div class="col-8">
+                                                            {% if edit == true %}
+                                                                <select name="salesChannelId" data-cy="sales_channel"
+                                                                        class="form-control form-control-sm">
+                                                                    {% for salesChannel in salesChannels %}
+                                                                        <option value="{{ salesChannel.id }}"
+                                                                                {{ order.salesChannel.id == salesChannel.id ? ' selected="selected" ' }}
+                                                                        >
+                                                                            {{ salesChannel.name }}
+                                                                        </option>
+                                                                    {% endfor %}
+                                                                </select>
+                                                            {% else %}
+                                                                {{ order.salesChannel.name }}
+                                                            {% endif %}
+                                                        </div>
+                                                    </div>
+                                                    <div class="row form-group">
+                                                        <div class="col-4">Site</div>
+                                                        <div class="col-8">
+                                                            {% if edit == true %}
+                                                                <select name="sitemapDomainId" data-cy="siteID"
+                                                                        class="form-control form-control-sm">
+                                                                    {% for sitemapDomain in sitemapDomains %}
+                                                                        <option value="{{ sitemapDomain.id }}"
+                                                                                {{ order.domain.id == sitemapDomain.id ? ' selected="selected" ' }}
+                                                                        >
+                                                                            {{ sitemapDomain.domain }}
+                                                                        </option>
+                                                                    {% endfor %}
+                                                                </select>
+                                                            {% else %}
+                                                                {{ order.domain.domain }}
+                                                            {% endif %}
+                                                        </div>
+                                                    </div>
+                                                    <div class="row form-group">
+                                                        <div class="col-4">
+                                                            {% if order.orderNo and order.customer and order.customer.email %}
+                                                                <a data-cy="view_sent_emails" target="_blank"
+                                                                   href="{{ path('emails_default', {'subject': order.orderNo, 'recipient': order.customer.email ?? '' }) }}"
+                                                                >
+                                                                    View sent emails
+                                                                </a>
+                                                            {% endif %}
+                                                        </div>
+                                                        <div class="col-8">
+                                                            {% if order.customer %}
+                                                                <a data-cy="view_customet" target="_blank"
+                                                                   href="{{ path('customers_view', {'id': order.customer.id }) }}"
+                                                                >
+                                                                    View customer
+                                                                </a>
+                                                            {% endif %}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div class="col-3">
+                                                    <div class="card border-secondary border rounded h-100">
+                                                        <div class="card-body">
+                                                            <div class="header-title font-weight-bold">
+                                                                Billing information
+                                                                {% if edit == true %}
+                                                                <a href="#" class="pull-right float-right"
+                                                                   data-toggle="modal"
+                                                                   data-cy="edit_billing"
+                                                                   data-target="#order_billing_address_modal"
+                                                                >
+                                                                    Edit
+                                                                </a>
+                                                                {% endif %}
+                                                            </div>
+                                                            <div class="row">
+                                                                <div class="col-12">
+                                                                    <div id="billing_info" data-cy="billing_info">
+                                                                        {% if order.orderBillingAddress.customerType == "legal" %}
+                                                                            {{ order.orderBillingAddress.companyName }}  {{ order.orderBillingAddress.companyVat }}
+                                                                            <br>
+                                                                        {% endif %}
+                                                                        {{ order.orderBillingAddress.name }} {{ order.orderBillingAddress.surname }}
+                                                                        <br>
+                                                                        {% if order.orderBillingAddress.eoriNumber %}
+                                                                            {{ attribute(order.orderBillingAddress.country.buyerCustomId.label, 'en') }}:
+                                                                            {{ order.orderBillingAddress.eoriNumber }}<br>
+                                                                        {% endif %}
+                                                                        {{ order.orderBillingAddress.address }}
+                                                                        , {{ order.orderBillingAddress.city }}<br>
+                                                                        {% if order.orderBillingAddress.region %}
+                                                                            {{ order.orderBillingAddress.region.title.en }}<br>
+                                                                        {% endif %}
+                                                                        {% if order.externalOrder and order.externalOrder.billingRegion %}
+                                                                            {{ order.externalOrder.billingRegion }}<br>
+                                                                        {% endif %}
+                                                                        {{ order.orderBillingAddress.country.name }}
+                                                                        , {{ order.orderBillingAddress.postIndex }}<br>
+                                                                        {{ order.orderBillingAddress.phone }}<br>
+                                                                        {{ order.orderBillingAddress.email }}
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div class="col-3">
+                                                    <div class="card border-secondary border rounded h-100">
+                                                        <div class="card-body">
+                                                            <div class="header-title font-weight-bold">
+                                                                Shipping information
+                                                                {% if edit == true %}
+                                                                <a href="#" class="pull-right float-right"
+                                                                   data-toggle="modal"
+                                                                   data-cy="edit_shipping"
+                                                                   data-target="#order_shipping_address_modal"
+                                                                >
+                                                                    Edit
+                                                                </a>
+                                                                {% endif %}
+                                                            </div>
+                                                            <div class="row">
+                                                                <div class="col-12">
+                                                                    <div id="shipping_info" data-cy="shipping_info">
+                                                                        {{ order.orderShippingAddress.name }} {{ order.orderShippingAddress.surname }}
+                                                                        <br>
+                                                                        {{ order.orderShippingAddress.address }}
+                                                                        , {{ order.orderShippingAddress.city }}<br>
+                                                                        {% if order.orderShippingAddress.region %}
+                                                                            {{ order.orderShippingAddress.region.title.en }}<br>
+                                                                        {% endif %}
+                                                                        {% if order.externalOrder and order.externalOrder.shippingRegion %}
+                                                                            {{ order.externalOrder.shippingRegion }}<br>
+                                                                        {% endif %}
+                                                                        {{ order.orderShippingAddress.country.name }}
+                                                                        , {{ order.orderShippingAddress.postIndex }}<br>
+                                                                        {{ order.orderShippingAddress.phone }}<br>
+                                                                        {{ order.orderShippingAddress.email }}
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div class="col-3">
+                                                    <div class="card border-secondary border rounded h-100">
+                                                        <div class="card-body">
+                                                            <div class="header-title font-weight-bold">Delivery Information</div>
+                                                            <div class="row">
+                                                                <div class="col-5">Tracking number</div>
+                                                                <div class="col-5">{{ order.delivery.trackingNumber }}</div>
+                                                                <div class="col-2 d-none">
+                                                                    <button class="btn btn-sm btn-outline-primary"
+                                                                            type="button" data-cy="print_label">Print label
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                            <div class="row">
+                                                                <div class="col-5">Delivery method</div>
+                                                                <div class="col-7">
+                                                                    {% if edit == true %}
+                                                                        <div class="form-group">
+                                                                            <select id="deliveryServiceId"
+                                                                                    name="deliveryServiceId"
+                                                                                    data-cy="delivery_method"
+                                                                                    class="form-control form-control-sm">
+                                                                                <option value="{{ order.delivery.deliveryService.id | default(0) }}"
+                                                                                        selected="selected" data-price="{{ order.delivery.deliverySum }}"
+                                                                                        data-default="1"
+                                                                                >
+                                                                                    {{ order.delivery.deliveryService.name.en | default('') }} -
+                                                                                    {{ currencyData.formatAmountWithCurrency(order.delivery.deliverySum, order.currency.uid3, roundSymbols) }}
+                                                                                </option>
+                                                                                <option data-default="1" disabled="disabled">-----------------</option>
+                                                                            </select>
+                                                                        </div>
+                                                                    {% else %}
+                                                                        {{ order.delivery.deliveryService.name.en | default('') }} ({{ order.delivery.deliveryService.type  | default('') }})
+                                                                    {% endif %}
+                                                                </div>
+                                                            </div>
+                                                            <div class="row">
+                                                                <div class="col-5">Delivery price</div>
+                                                                <div class="col-7">
+                                                                    {% if edit == true %}
+                                                                        <div class="form-group">
+                                                                            <div class="row">
+                                                                                <div class="col-1">
+                                                                                    <i class="fas fa-lock text-muted cursor-pointer" id="enableCustomDeliveryCost" data-cy="custom_delivery"></i>
+                                                                                </div>
+                                                                                <div class="col-10">
+                                                                                    <div class="input-group input-group-sm">
+                                                                                        {% if order.currency.signSide == 'LEFT' %}
+                                                                                            <div class="input-group-prepend">
+                                                                                                <span class="input-group-text" id="currency-addon" data-cy="currency-addon-left">{{ order.currency.sign }}</span>
+                                                                                            </div>
+                                                                                        {% endif %}
+                                                                                        <input type="text"
+                                                                                               class="form-control form-control-sm"
+                                                                                               id="customDeliveryCost"
+                                                                                               name="customDeliveryCost"
+                                                                                               placeholder="Delivery price"
+                                                                                               data-cy="custom_delivery_coast"
+                                                                                               aria-label="Delivery price"
+                                                                                               aria-describedby="currency-addon"
+                                                                                               value="{{ order.delivery.deliverySum|number_format(roundSymbols) }}"
+                                                                                               disabled
+                                                                                        >
+                                                                                        {% if order.currency.signSide == 'RIGHT' %}
+                                                                                            <div class="input-group-append">
+                                                                                                <span class="input-group-text" id="currency-addon" data-cy="currency-addon-right">{{ order.currency.sign }}</span>
+                                                                                            </div>
+                                                                                        {% endif %}
+                                                                                    </div>
+                                                                                </div>
+                                                                            </div>
+                                                                        </div>
+                                                                    {% else %}
+                                                                        {{ currencyData.formatAmountWithCurrency(order.delivery.deliverySum, order.currency.uid3, roundSymbols) }}
+                                                                    {% endif %}
+                                                                </div>
+                                                            </div>
+                                                            <div class="row {{ order.delivery.deliveryTerminal != null ? '' : 'd-none' }}">
+                                                                <div class="col-5">Delivery terminal</div>
+                                                                <div class="col-7">
+                                                                    {% set terminalDeleted = order.delivery.deliveryTerminal and order.delivery.deliveryTerminal.deletedAt %}
+                                                                    {% if edit == true %}
+                                                                        <select data-service="{{ order.delivery.deliveryService.id | default(0) }}"
+                                                                                name="deliveryTerminalId"
+                                                                                data-cy="delivery_terminal_id"
+                                                                                class="form-control form-control-sm"
+                                                                        >
+                                                                            <option value="{{ order.delivery.deliveryTerminal.id | default('') }}"
+                                                                                    {{ order.delivery.deliveryTerminal != null ? ' selected="selected" ' : '' }}
+                                                                            >
+                                                                                {{ order.delivery.deliveryTerminal.name | default('') }}
+                                                                            </option>
+                                                                        </select>
+                                                                    {% else %}
+                                                                        <p class="{{ terminalDeleted ? 'text-silver-chalice' : '' }}">{{ order.delivery.deliveryTerminal.name | default('') }}</p>
+                                                                    {% endif %}
+                                                                </div>
+                                                            </div>
+                                                            <div class="row">
+                                                                <div class="col-5">Total weight</div>
+                                                                <div class="col-7">
+                                                                    <span class="orderWeight">{{ order.productsWeight }}</span>
+                                                                    <small>kg</small>
+                                                                </div>
+                                                            </div>
+                                                            <div class="row">
+                                                                <div class="col-5">Total volume</div>
+                                                                <div class="col-7">
+                                                                    <span class="orderVolume">{{ order.totalVolume }}</span>
+                                                                    <small>m<sup>3</sup></small>
+                                                                </div>
+                                                            </div>
+                                                            <div class="row">
+                                                                <div class="col-5">Delivery insurance</div>
+                                                                <div class="col-7">
+                                                                    {% if edit == true %}
+                                                                        <div class="custom-control custom-switch">
+                                                                            <input class="custom-control-input" type="checkbox"
+                                                                                   name="deliveryInsurance"
+                                                                                   id="deliveryInsurance"
+                                                                                   data-cy="delivery_insyrance"
+                                                                                   value="1"
+                                                                                    {{ order.insurancePerc > 0 ? ' checked="checked" ' : '' }}
+                                                                            >
+                                                                            <label class="custom-control-label"
+                                                                                   for="deliveryInsurance"></label>
+                                                                        </div>
+                                                                    {% else %}
+                                                                        {{ order.insurancePerc ? 'Yes' : 'No' }}
+                                                                    {% endif %}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-12">
+                                    <div class="card">
+                                        <div class="card-body pr-1 pl-1 pt-0 pb-0">
+                                            <table id="products" data-cy="products_table" class="table table-sm table-striped products-violation">
+                                                <thead>
+                                                <tr>
+                                                    <th colspan="2">Product</th>
+                                                    <th style="width:5%">Condition</th>
+                                                    <th style="width:5%">Version</th>
+                                                    <th style="width:10%">Arrive</th>
+                                                    <th style="width:9%">Stock</th>
+                                                    <th style="width:3%">Res.</th>
+                                                    <th style="width:3%">Av.</th>
+                                                    <th style="width:6%">Amount</th>
+                                                    <th style="width:5%">VAT%</th>
+                                                    <th style="width:8%">Price group</th>
+                                                    {% if edit == true %}
+                                                        <th style="width:2%">FP</th>
+                                                    {% endif %}
+                                                    <th class="text-right" style="width:8%">
+                                                        Price, {{ order.currency.uid3 }}</th>
+                                                    <th class="text-right" style="width:5%">1C</th>
+                                                    {% if edit == true %}
+                                                        <th style="width:2%">Del.</th>
+                                                    {% endif %}
+                                                </tr>
+                                                </thead>
+                                                <tbody>
+                                                <tr class="d-none tablePlaceholder">
+                                                    <td style="width: 48px"></td>
+                                                    <td class="text-nowrap">
+                                                        <div class="row productDetailsContainer">
+                                                            <div class="col-sm-10">
+                                                                <div class="productDetails d-none">
+                                                                    <h5>
+                                                                        <a href="" data-cy="product_link" class="productLink text-wrap"></a>
+                                                                    </h5>
+                                                                    <div><small class="productMpn"></small></div>
+                                                                </div>
+                                                                <div class="productSelector" data-cy="product-autocomplite">
+                                                                    {{ autocomplete(
+                                                                        '',
+                                                                        'products[0][productId]',
+                                                                        '',
+                                                                        'product',
+                                                                        ''
+                                                                    ) }}
+                                                                </div>
+                                                            </div>
+                                                            <div class="col-sm-2 text-right"></div>
+                                                        </div>
+                                                    </td>
+                                                    <td>
+                                                        <select name="products[0][conditionId]"
+                                                                class="form-control form-control-sm" data-cy="conditionID">
+                                                            {% for condition in conditions %}
+                                                                <option value="{{ condition.id }}"
+                                                                        {{ condition.standard ? ' selected="selected" ' : '' }}
+                                                                >
+                                                                    {{ condition.title.en }}
+                                                                </option>
+                                                            {% endfor %}
+                                                        </select>
+                                                    </td>
+                                                    <td>
+                                                        <select name="products[0][versionId]"
+                                                                class="form-control form-control-sm d-none" data-cy="versionID">
+                                                            <option value=""></option>
+                                                        </select>
+                                                    </td>
+                                                    <td></td>
+                                                    <td>
+                                                        <select name="products[0][stockId]"
+                                                                class="form-control form-control-sm" data-cy="stockID">
+                                                            {% for warehouse in order.realDomain.warehouses %}
+                                                                <option value="{{ warehouse.id }}">{{ warehouse.name }}</option>
+                                                            {% endfor %}
+                                                        </select>
+                                                    </td>
+                                                    <td></td>
+                                                    <td></td>
+                                                    <td>
+                                                        <input type="text" name="products[0][amount]"
+                                                               class="form-control form-control-sm" data-cy="warehouseID">
+                                                    </td>
+                                                    <td></td>
+                                                    <td>
+                                                        <select name="products[0][priceGroupId]"
+                                                                class="form-control form-control-sm" data-cy="price_group">
+                                                            <option value=""></option>
+                                                            {% for priceGroup in priceGroups %}
+                                                                <option value="{{ priceGroup.id }}">{{ priceGroup.title }}</option>
+                                                            {% endfor %}
+                                                        </select>
+                                                    </td>
+                                                    {% if edit == true %}
+                                                        <td class="text-right">
+                                                            <input type="checkbox" name="products[0][fixedPrice]"
+                                                                   value="1"
+                                                                   class="form-control-sm" data-cy="fixed_price">
+                                                        </td>
+                                                    {% endif %}
+                                                    <td>
+                                                        <input type="text" name="products[0][price]"
+                                                               class="text-right form-control form-control-sm" data-cy="price">
+                                                    </td>
+                                                    <td></td>
+                                                    {% if edit == true %}
+                                                        <td class="delete" data-cy="delete_product">{{ delete_row(0, false, 'products', null, 'deleteProductCallback') }}</td>
+                                                    {% endif %}
+                                                </tr>
+                                                {% for product in order.productsOrdered %}
+                                                    {% set catalogueProduct = product.product %}
+                                                    {% set onecProduct = product.product.onecProduct %}
+                                                    <tr>
+                                                        <td style="width: 48px">
+                                                            {% if catalogueProduct.images %}
+                                                                {% set thumbnail = catalogueProduct.images[0] is defined and catalogueProduct.images[0].imageVariant('tiny') is not null
+                                                                    ? catalogueProduct.images[0].imageVariant('tiny').path
+                                                                    : '' %}
+                                                                {{ modal_carousel(
+                                                                    "carouselModalArrivals"~ catalogueProduct.id,
+                                                                    catalogueProduct.dStringTitle.en,
+                                                                    catalogueProduct.id,
+                                                                    thumbnail
+                                                                ) }}
+                                                            {% endif %}
+                                                        </td>
+                                                        <td class="text-nowrap">
+                                                            <div class="row productDetailsContainer">
+                                                                <div class="col-sm-10">
+                                                                    <div class="productDetails">
+                                                                        <h5>
+                                                                            <a href="{{ path('catalogue_edit_product', {'productId': catalogueProduct.id}) }}"
+                                                                               class="productLink text-wrap mr-1"
+                                                                               data-cy="product_link"
+                                                                            >
+                                                                                {{ catalogueProduct.dStringTitle.en }}
+                                                                            </a>
+                                                                            {% if catalogueProduct.new %}
+                                                                                <span class="productType badge badge-info">NEW</span>
+                                                                            {% elseif catalogueProduct.sale %}
+                                                                                <span class="productType badge badge-info">SALE</span>
+                                                                            {% endif %}
+                                                                        </h5>
+                                                                        <div class="row">
+                                                                            <div class="col-12">
+                                                                                <small class="productMpn">MPN: {{ catalogueProduct.mpn }}</small>
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                    <div class="productSelector d-none">
+                                                                        <input type="hidden"
+                                                                               name="products[{{ loop.index }}][id]"
+                                                                               data-cy="product_selector"
+                                                                               value="{{ product.id }}"
+                                                                        >
+                                                                        {{ autocomplete(
+                                                                            product.product.id,
+                                                                            'products['~loop.index~'][productId]',
+                                                                            catalogueProduct.dStringTitle.en,
+                                                                            'product',
+                                                                            ''
+                                                                        ) }}
+                                                                    </div>
+                                                                </div>
+                                                                {% if edit == true %}
+                                                                    <div class="col-sm-2 text-right">
+                                                                        <i class="btn uil-pen toggleEditProduct" data-cy="toggleEditProduct"></i>
+                                                                    </div>
+                                                                {% endif %}
+                                                            </div>
+                                                        </td>
+                                                        <td>
+                                                            {% if edit == true %}
+                                                                <select name="products[{{ loop.index }}][conditionId]"
+                                                                        class="form-control form-control-sm"
+                                                                        data-cy="product_condition">
+                                                                    {% for condition in conditions %}
+                                                                        <option value="{{ condition.id }}"
+                                                                                {{ condition.id == product.onecCondition.id ? ' selected="selected" ' : '' }}
+                                                                        >
+                                                                            {{ condition.title.en }}
+                                                                        </option>
+                                                                    {% endfor %}
+                                                                </select>
+                                                            {% else %}
+                                                                {{ product.onecCondition.title.en }}
+                                                            {% endif %}
+                                                        </td>
+                                                        <td>
+                                                            {% if onecProduct %}
+                                                                {# @todo fix for multi-products needed #}
+                                                                {% set characteristics = onecProduct.getChildValues() %}
+                                                                {% if edit == true %}
+                                                                    <select class="form-control form-control-sm {{ characteristics|length == 0 ? 'd-none' : '' }}"
+                                                                            name="products[{{ loop.index }}][versionId]"
+                                                                            data-cy="product_versionID"
+                                                                    >
+                                                                        <option value=""></option>
+                                                                        {% for id, name in characteristics %}
+                                                                            <option value="{{ id }}"
+                                                                                    {{ product.variation and id == product.variation.id ? ' selected="selected" ' : '' }}
+                                                                            >
+                                                                                {{ name }}
+                                                                            </option>
+                                                                        {% endfor %}
+                                                                    </select>
+                                                                {% else %}
+                                                                    {{ product.variation ? characteristics[product.variation.id] : '' | default('') }}
+                                                                {% endif %}
+                                                            {% endif %}
+                                                        </td>
+                                                        <td>
+                                                            {% set variationId = product.variation ? product.variation.id : null %}
+                                                            {% for row in productDataProvider.getProductArrivals(product.product.id, variationId) %}
+                                                                {% if row.stock == product.stock.name %}
+                                                                    <div>
+                                                                        <a target="_blank"
+                                                                           href="{{ path('arrivals_edit', {'id': row.arrivalId}) }}"
+                                                                           data-cy="arrivals_edit">
+                                                                            {{ row.date|date('Y-m-d') }}
+                                                                        </a> - {{ row.amount }}
+                                                                    </div>
+                                                                {% endif %}
+                                                            {% endfor %}
+                                                        </td>
+                                                        <td>
+                                                            {% if edit == true %}
+                                                                <select name="products[{{ loop.index }}][stockId]"
+                                                                        class="form-control form-control-sm"
+                                                                        data-cy="product_stockID">
+                                                                    {% for warehouse in order.realDomain.warehouses %}
+                                                                        <option value="{{ warehouse.id }}"
+                                                                                {{ product.stock.id == warehouse.id ? ' selected="selected" ' : '' }}
+                                                                        >
+                                                                            {{ warehouse.name }}
+                                                                        </option>
+                                                                    {% endfor %}
+                                                                </select>
+                                                            {% else %}
+                                                                {{ product.stock.name }}
+                                                            {% endif %}
+                                                        </td>
+                                                        <td>
+                                                            {# @var warehouseProduct \App\Entity\SymOneCWarehouseProduct #}
+                                                            {% if product.product.onecProduct %}
+                                                                {% for warehouseProduct in product.product.onecProduct.allWarehouseProducts %}
+                                                                    {% if warehouseProduct.oneCCondition.id == product.onecCondition.id and warehouseProduct.oneCWarehouse.warehouse.id == product.stock.id and warehouseProduct.amountReserved > 0 %}
+                                                                        <div>{{ warehouseProduct.amountReserved }}</div>
+                                                                    {% endif %}
+                                                                {% endfor %}
+                                                            {% endif %}
+                                                        </td>
+                                                        <td class="text-nowrap">
+                                                            {# @var warehouseProduct \App\Entity\SymOneCWarehouseProduct #}
+                                                            {% if product.product.onecProduct %}
+                                                                {% for warehouseProduct in product.product.onecProduct.allWarehouseProducts %}
+                                                                    {% if warehouseProduct.oneCCondition.id == product.onecCondition.id and warehouseProduct.oneCWarehouse.warehouse.id == product.stock.id and  warehouseProduct.amount > 0 %}
+                                                                        <div>{{ warehouseProduct.amount }}</div>
+                                                                    {% endif %}
+                                                                {% endfor %}
+                                                            {% endif %}
+                                                        </td>
+                                                        <td>
+                                                            {% if edit == true %}
+                                                                <input type="text" name="products[{{ loop.index }}][amount]"
+                                                                       class="form-control form-control-sm"
+                                                                       data-cy="products_amount"
+                                                                       value="{{ product.amount }}"
+                                                                >
+                                                            {% else %}
+                                                                {{ product.amount }}
+                                                            {% endif %}
+                                                        </td>
+                                                        <td class="taxPerc">{{ order.taxPerc }}%</td>
+                                                        <td>
+                                                            {% if edit == true %}
+                                                                <select name="products[{{ loop.index }}][priceGroupId]"
+                                                                        class="form-control form-control-sm"
+                                                                        data-cy="products_price_group">
+                                                                    <option value=""></option>
+                                                                    {% for priceGroup in priceGroups %}
+                                                                        <option value="{{ priceGroup.id }}"
+                                                                                {{ product.priceGroup and product.priceGroup.id == priceGroup.id ? ' selected="selected" ' : '' }}
+                                                                        >
+                                                                            {{ priceGroup.title }}
+                                                                        </option>
+                                                                    {% endfor %}
+                                                                </select>
+                                                            {% else %}
+                                                                {{ product.priceGroup.title | default('') }}
+                                                            {% endif %}
+                                                        </td>
+                                                        {% if edit == true %}
+                                                            <td class="text-right">
+                                                                <input type="checkbox"
+                                                                       name="products[{{ loop.index }}][fixedPrice]"
+                                                                       data-cy="products_fixed_price"
+                                                                       class="form-control-sm"
+                                                                       value="1"
+                                                                        {{ product.fixedPrice ? ' checked="checked" ' : '' }}
+                                                                >
+                                                            </td>
+                                                        {% endif %}
+                                                        <td class="text-right">
+                                                            {% if edit == true %}
+                                                                <input type="text" name="products[{{ loop.index }}][price]"
+                                                                       class="text-right form-control form-control-sm"
+                                                                       data-cy="products_price"
+                                                                       value="{{ product.price }}"
+                                                                >
+                                                            {% else %}
+                                                                {{ currencyData.formatAmountWithCurrency(product.price, order.currency.uid3, 4) }}
+                                                            {% endif %}
+                                                        </td>
+                                                        <td class="text-right">{{ product.costPrice }}</td>
+                                                        {% if edit == true %}
+                                                            <td class="deleteRow" data-cy="delete_row">{{ delete_row(0, product.id, 'products', null, 'deleteProductCallback') }}</td>
+                                                        {% endif %}
+                                                    </tr>
+                                                {% endfor %}
+                                                </tbody>
+                                            </table>
+                                            {% if edit == true %}
+                                                <div class="row mb-1">
+                                                    <div class="col-10" data-cy="add_row">{{ add_row('products', false, 'setRowDefaults') }}</div>
+                                                    <div class="col-2">
+                                                        <div class="row">
+                                                            <label class="col-5">Price group</label>
+                                                            <select name="commonPriceGroupId"
+                                                                    class="col-6 form-control form-control-sm">
+                                                                <option value=""></option>
+                                                                {% for priceGroup in priceGroups %}
+                                                                    <option value="{{ priceGroup.id }}">{{ priceGroup.title }}</option>
+                                                                {% endfor %}
+                                                            </select>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-12">
+                                    <div class="row mb-2">
+                                        <div class="col-3">
+                                            <div class="card h-100">
+                                                <div class="card-header">Comments</div>
+                                                <div class="card-body">
+                                                    <div class="row mb-2">
+                                                        <div class="col">
+                                                            {% if edit == true %}
+                                                                <textarea name="comment" data-cy="comment_area" class="form-control form-control-sm" rows="4">{{ order.customerComment }}</textarea>
+                                                            {% else %}
+                                                                {{ order.customerComment }}
+                                                            {% endif %}
+                                                        </div>
+                                                    </div>
+                                                    <div class="row">
+                                                        <div class="col-6">Currency</div>
+                                                        <div class="col-6" id="currencyId">
+                                                            {% if edit == true %}
+                                                                <select name="currencyId" class="form-control form-control-sm">
+                                                                    <option value=""></option>
+                                                                    {% for currency in currencyData.currencies %}
+                                                                        <option value="{{ currency.id }}"
+                                                                            {{ order.currency and order.currency.id == currency.id ? ' selected="selected" ' : '' }}
+                                                                        >
+                                                                            {{ currency.uid3 }}
+                                                                        </option>
+                                                                    {% endfor %}
+                                                                </select>
+                                                            {% else %}
+                                                                {{ order.currency.uid3 }}
+                                                            {% endif %}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-3">
+                                            <div class="card h-100">
+                                                <div class="card-header">Seller</div>
+                                                <div class="card-body">
+                                                    <div class="row">
+                                                        <div class="col-12">
+                                                            <div class="row">
+                                                                <div class="col-6">VAT ID</div>
+                                                                <div class="col-6" id="vatId">
+                                                                    {% if edit == true %}
+                                                                        <select name="sellerId" data-cy="sellerID" class="form-control form-control-sm">
+                                                                            <option value=""></option>
+                                                                            {% for seller in sellerDataProvider.sellers %}
+                                                                                <option value="{{ seller.id }}"
+                                                                                        {{ order.seller and order.seller.seller and order.seller.seller.id == seller.id ? ' selected="selected" ' : '' }}
+                                                                                >
+                                                                                    {{ seller.vatNo }}
+                                                                                </option>
+                                                                            {% endfor %}
+                                                                        </select>
+                                                                    {% else %}
+                                                                        {{ order.seller.seller.vatNo | default('') }}
+                                                                    {% endif %}
+                                                                </div>
+                                                            </div>
+                                                            <div class="row">
+                                                                <div class="col-6">OSS ID</div>
+                                                                <div class="col-6" id="ossId">
+                                                                    {% if edit == true %}
+                                                                        <select name="ossId" data-cy="ossID" class="form-control form-control-sm">
+                                                                            <option value=""></option>
+                                                                            {% for oss in sellerDataProvider.sellerOss %}
+                                                                                <option value="{{ oss.id }}"
+                                                                                        {{ order.seller and order.seller.oss and order.seller.oss.id == oss.id ? ' selected="selected" ' : '' }}
+                                                                                >
+                                                                                    {{ oss.uid }}
+                                                                                </option>
+                                                                            {% endfor %}
+                                                                        </select>
+                                                                    {% else %}
+                                                                        {{ order.seller.oss.uid | default('') }}
+                                                                    {% endif %}
+                                                                </div>
+                                                            </div>
+                                                            <div class="row">
+                                                                <div class="col-6">Stock in country</div>
+                                                                <div class="col-6">{{ order.seller ? order.seller.stockCountry.title.en : '' }}</div>
+                                                            </div>
+                                                            <div class="row">
+                                                                <div class="col-6">Deal Type</div>
+                                                                <div class="col-6" id="dealType" data-cy="deal_type">
+                                                                    {% if edit == true %}
+                                                                        <select name="dealType" class="form-control form-control-sm">
+                                                                            <option value=""></option>
+                                                                            {% for id, label in dealTypes %}
+                                                                                <option value="{{ id }}"
+                                                                                        {{ order.seller and order.seller.dealType == id ? ' selected="selected" ' : '' }}
+                                                                                >
+                                                                                    {{ label }}
+                                                                                </option>
+                                                                            {% endfor %}
+                                                                        </select>
+                                                                    {% else %}
+                                                                        {{ order.seller ? order.seller.dealType : '' }}
+                                                                    {% endif %}
+                                                                </div>
+                                                            </div>
+                                                            <div class="row">
+                                                                <div class="col-6">Incoterms</div>
+                                                                <div class="col-6" id="incoterms">
+                                                                    {% if edit == true %}
+                                                                        <select name="incoterms" data-cy="incoterms" class="form-control form-control-sm">
+                                                                            <option value=""></option>
+                                                                            {% for id in incoterms %}
+                                                                                <option value="{{ id }}"
+                                                                                        {{ order.seller and order.seller.incoterms == id ? ' selected="selected" ' : '' }}
+                                                                                >
+                                                                                    {{ id }}
+                                                                                </option>
+                                                                            {% endfor %}
+                                                                        </select>
+                                                                    {% else %}
+                                                                        {{ order.seller ? order.seller.incoterms : '' }}
+                                                                    {% endif %}
+                                                                </div>
+                                                            </div>
+                                                            <div class="row">
+                                                                <div class="col-6">Order Settings</div>
+                                                                <div class="col-2" id="orderSettings">
+                                                                    {% if order.seller and order.seller.settingsEntity %}
+                                                                        <a data-cy="order_settings" href="{{ path('sellers_order_settings_edit', {'settingsId' : order.seller.settingsEntity.id}) }}">
+                                                                            #{{ order.seller.settingsEntity.num + 1 }}
+                                                                        </a>
+                                                                    {% endif %}
+                                                                </div>
+                                                                <div class="col-4">
+                                                                    <input type="hidden" name="vatId" data-cy="vatID"
+                                                                           value="{{ order.seller.settingsEntity.id | default('') }}">
+                                                                    {% if edit == true %}
+                                                                        <button type="button" id="checkSeller" data-cy="update_seller" class="btn btn-sm btn-primary">
+                                                                            <span class="spinner-border spinner-border-sm mr-1 d-none" role="status"></span>
+                                                                            <span>Update</span>
+                                                                        </button>
+                                                                    {% endif %}
+                                                                </div>
+                                                            </div>
+                                                            <div class="row">
+                                                                <div class="col-6">VAT %</div>
+                                                                <div class="col-6" id="incoterms">
+                                                                    {% if edit == true %}
+                                                                        <input type="text" name="taxPerc" id="taxPerc" data-cy="tax_percent"
+                                                                               class="text-right form-control form-control-sm"
+                                                                               value="{{ order.taxPerc }}"
+                                                                        >
+                                                                    {% else %}
+                                                                        {{ order.taxPerc }}%
+                                                                    {% endif %}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-3">
+                                            <div class="card h-100">
+                                                <div class="card-header">Tax collector</div>
+                                                <div class="card-body">
+                                                    <div class="col-12">
+                                                        <div class="row">
+                                                            <div class="col-6">TC ID</div>
+                                                            <div class="col-6 tcId">
+                                                                {% if edit == true %}
+                                                                    <select name="taxCollectorId" data-cy="tax_collector_id" class="form-control form-control-sm">
+                                                                        <option value=""></option>
+                                                                        {% for tc in sellerDataProvider.taxCollectors %}
+                                                                            <option value="{{ tc.id }}"
+                                                                                    {{ order.seller and order.seller.taxCollector and order.seller.taxCollector.id == tc.id ? ' selected="selected" ' : '' }}
+                                                                            >
+                                                                                {{ tc.uid }}
+                                                                            </option>
+                                                                        {% endfor %}
+                                                                    </select>
+                                                                {% else %}
+                                                                    {{ order.seller.taxCollector.uid | default('') }}
+                                                                {% endif %}
+                                                            </div>
+                                                        </div>
+                                                        <div class="row">
+                                                            <div class="col-6">TC %</div>
+                                                            <div class="col-6 tcTaxPercent">
+                                                                {% if edit == true %}
+                                                                    <input type="text" data-cy="TC_percent" class="form-control form-control-sm" id="tcTaxPercent"
+                                                                           name="taxCollectorTaxPercent"
+                                                                           value="{{ order.seller.taxCollectorTax | default('') }}">
+                                                                {% else %}
+                                                                    {{ order.seller.taxCollectorTax | default('') }}
+                                                                {% endif %}
+                                                            </div>
+                                                        </div>
+                                                        <div class="row">
+                                                            <div class="col-6">Deal Type</div>
+                                                            <div class="col-6 tcDealType">
+                                                                {% if edit == true %}
+                                                                    <select name="taxCollectorDealType" data-cy="tax_collector_deal_type" class="form-control form-control-sm">
+                                                                        <option value=""></option>
+                                                                        {% for id, label in dealTypes %}
+                                                                            <option value="{{ id }}"
+                                                                                    {{ order.seller and order.seller.taxCollectorDealType == id ? ' selected="selected" ' : '' }}
+                                                                            >
+                                                                                {{ label }}
+                                                                            </option>
+                                                                        {% endfor %}
+                                                                    </select>
+                                                                {% else %}
+                                                                    {{ order.seller.taxCollectorDealType | default('') }}
+                                                                {% endif %}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-3">
+                                            <div class="card h-100">
+                                                <div class="card-header">Totals</div>
+                                                <div class="card-body">
+                                                    <div class="row">
+                                                        <div class="col-6">Subtotal</div>
+                                                        <div class="col-4 text-right orderProductsPrice" data-cy="subtotal_sum">{{ currencyData.formatAmountWithCurrency(order.productsTotal, order.currency.uid3) }}</div>
+                                                    </div>
+                                                    <div class="row mt-1 pt-1 border-top">
+                                                        <div class="col-6">Delivery</div>
+                                                        <div class="col-4 text-right orderDeliveryPrice" data-cy="delivery_price">{{ currencyData.formatAmountWithCurrency(order.delivery.deliverySum, order.currency.uid3, roundSymbols) }}</div>
+                                                        <div class="col-2 text-left"><i class="d-none fas fa-pen text-muted customDeliveryPriceFlag" data-cy="edit_delivery_manual" title="Delivery price differs from the current prices"></i></div>
+                                                    </div>
+                                                    <div class="row">
+                                                        {% if edit == true %}
+                                                        <div class="col-6">
+                                                            <div class="row">
+                                                                <div class="col-6 pr-0">Warranty</div>
+                                                                <div class="col-4 p-0" data-cy="warranty">
+                                                                    <select name="warrantyId" data-cy="warranty_manual_select" class="form-control form-control-sm">
+                                                                        <option value=""></option>
+                                                                        {% for warranty in warranties %}
+                                                                            <option value="{{ warranty.id }}"
+                                                                                {{ warranty.percentage == order.warrantyPerc ? ' selected="selected" ' : '' }}
+                                                                            >
+                                                                                {{ warranty.month }}
+                                                                            </option>
+                                                                        {% endfor %}
+                                                                    </select>
+                                                                </div>
+                                                                <div class="col-2"></div>
+                                                            </div>
+                                                        </div>
+                                                        {% else %}
+                                                            <div class="col-6">Warranty {{ order.warrantyPerc > 0 ? order.warrantyMonth : '' }}</div>
+                                                        {% endif %}
+                                                        <div class="col-4 text-right orderWarrantyPrice" data-cy="warranty_perc">{{ currencyData.formatAmountWithCurrency(order.warrantyValue, order.currency.uid3) }}</div>
+                                                    </div>
+                                                    <div class="row">
+                                                        <div class="col-6">Insurance</div>
+                                                        <div class="col-4 text-right orderInsurancePrice" data-cy="insurance">{{ currencyData.formatAmountWithCurrency(order.insuranceValue, order.currency.uid3) }}</div>
+                                                    </div>
+                                                    <div class="row">
+                                                        <div class="col-6">Payment charge ({{ order.paymentFeePerc }}%)</div>
+                                                        <div class="col-4 text-right orderPaymentPrice" data-cy="payment_charge">{{ currencyData.formatAmountWithCurrency(order.paymentFeeValue, order.currency.uid3) }}</div>
+                                                    </div>
+                                                    <div class="row">
+                                                        <div class="col-6">VAT Tax</div>
+                                                        <div class="col-4 text-right orderVatPrice" data-cy="vat_tax_perc">
+                                                            {{ currencyData.formatAmountWithCurrency(order.taxValue, order.currency.uid3) }}
+                                                        </div>
+                                                    </div>
+                                                    <div class="row">
+                                                        <div class="col-6">TC Tax</div>
+                                                        <div class="col-4 text-right orderTcVatPrice" data-cy="TC_tax">
+                                                            {{ currencyData.formatAmountWithCurrency(order.taxCollectorTaxValue, order.currency.uid3) }}
+                                                        </div>
+                                                    </div>
+                                                    <div class="row">
+                                                        <div class="col-6">Total</div>
+                                                        <div class="col-4 orderTotalPrice text-right" data-cy="total_sum">{{ currencyData.formatAmountWithCurrency(order.orderTotal, order.currency.uid3) }}</div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-3">
+                                    <div class="card">
+                                        <div class="card-header">Admin comments</div>
+                                        <div class="card-body">
+                                            <div id="commentsList" data-cy="comment_list">
+                                                {% for comment in order.comments %}
+                                                    <div class="row mt-1 adminComment">
+                                                        <div class="col-2">
+                                                            <img src="{{ comment.author.photo is defined and comment.author.photo ? asset(comment.author.photoPath) : asset('images/no-user-profile-photo.png') }}"
+                                                                 height="32"
+                                                                 title="{{ comment.author.fullName }}"
+                                                                 alt="{{ comment.author.fullName }}"
+                                                            >
+                                                        </div>
+                                                        <div class="col-9 bg-light">
+                                                            <small>Created: {{ comment.createdAt.format('Y-m-d H:i') }}</small>
+                                                            <div>{{ comment.content }}</div>
+                                                        </div>
+                                                        <div class="col-1">
+                                                            {% if is_granted('ROLE_ADMIN') or comment.author.id == currentUser.id %}
+                                                                <span class="delete link deleteOrderComment" data-cy="delete_comment"
+                                                                      data-id="{{ comment.id }}">
+                                                    <i class="fa fa-times column-delete"></i>
+                                                </span>
+                                                            {% endif %}
+                                                        </div>
+                                                    </div>
+                                                {% endfor %}
+                                            </div>
+                                        <div class="row border-top mt-2 pt-2">
+                                            <div class="col-2">
+                                                <img src="{{ currentUser.photo is defined and currentUser.photo ? asset(currentUser.photoPath) : asset('images/no-user-profile-photo.png') }}"
+                                                     height="32"
+                                                     title="{{ currentUser.fullName }}"
+                                                     alt="{{ currentUser.fullName }}"
+                                                     id="commentAvatar"
+                                                >
+                                            </div>
+                                            <div class="col-8">
+                                                <input type="text" data-cy="comment_content" class="form-control form-control-sm commentContent"
+                                                       maxlength="255">
+                                            </div>
+                                            <div class="col-2">
+                                                <button class="btn btn-sm btn-primary addComment"
+                                                        data-order="{{ order.id }}" data-cy="add_comment">Add
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-3">
+                                <div class="card">
+                                    <div class="card-header">Attachments</div>
+                                    <div class="card-body">
+                                        <button id="sendPaymentEmail" data-cy="send_payment_email" data-id="{{ order.id }}" class="btn btn-sm btn-outline-info mb-3">Send payment email</button>
+                                        {% if proformaInvoiceId is defined and proformaInvoiceId %}
+                                            <a id="previewProforma" data-cy="preview_proforma" href="{{ path('invoices_preview', { 'invoiceId': proformaInvoiceId, 'orderId': order.id }) }}"
+                                               target="_blank" class="btn btn-sm btn-outline-danger mb-3"
+                                            >Preview proforma</a>
+                                        {% endif %}
+                                        <ul id="order_documents_list" data-cy="order_document_list">
+                                            {% for document in order.orderDocuments %}
+                                                <li>
+                                                    {% set splitPublic = document.path|split('/public') %}
+                                                    {% set path = splitPublic|length > 1 ? splitPublic[1] : document.path %}
+                                                    <a href="{{ path }}" target="_blank">
+                                                        {{ document.invoice ? document.invoice.name : document.path }}
+                                                    </a>
+                                                </li>
+                                            {% endfor %}
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-3">
+                                <div class="card">
+                                    <div class="card-header">Actions</div>
+                                    <div class="card-body">
+                                        <ol id="link-list">
+                                            <li>
+                                                <a data-cy="copy_to_new_order" class="link" data-toggle="modal" data-target="#copyOrderModal">
+                                                    Copy To New Order
+                                                </a>
+                                            </li>
+                                        </ol>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-3">
+                                <div class="card">
+                                    <div class="card-header">Export 1C</div>
+                                    <div class="card-body">
+                                        <div class="row">
+                                            <div class="col-4">Exported to 1C</div>
+                                            <div class="col-8">{{ activeStatus(order.export != null and order.export.exported) }}</div>
+                                        </div>
+                                        <div class="row">
+                                            {% set exportDate = (
+                                                    order.export != null and order.export.exported
+                                                        ? order.export.exportDate.format('Y-m-d H:i')
+                                                        : order.createdAt.format('Y-m-d H:i')
+                                                )
+                                            %}
+                                            <div class="col-4">Export date</div>
+                                            <div class="col-8">
+                                                {{
+                                                    daterange(
+                                                        '',
+                                                        'exportDate',
+                                                        exportDate,
+                                                        'true',
+                                                        'true',
+                                                        ['form-control-sm'],
+                                                        [],
+                                                        {'drops':'up'}|json_encode
+                                                    ) }}
+                                                </div>
+                                            </div>
+                                            <div class="row">
+                                                <div class="col-4">Allow export</div>
+                                                <div class="col-8">
+                                                    <input type="checkbox" id="allowExport" class="form-control form-control-sm"
+                                                        {{ order.export and order.export.allowExport ? 'checked' : '' }}
+                                                    >
+                                                </div>
+                                            </div>
+                                            <div class="row">
+                                                <div class="col-4">Delete 1C</div>
+                                                <div class="col-8">
+                                                    <input type="checkbox" id="deleteKA" class="form-control form-control-sm"
+                                                        {{ order.export and order.export.deleted ? 'checked' : '' }}
+                                                    >
+                                                </div>
+                                            </div>
+                                            <div class="row">
+                                                <div class="col-4">
+                                                    <button type="button" id="exportOrder" class="btn btn-sm btn-primary">
+                                                        Export
+                                                    </button>
+                                                </div>
+                                                <div class="col-8"></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    {% if edit == true %}</form>{% endif %}
+            </div>
+        </div>
+    </div>
+    <div class="modal fade preset-modal" id="copyOrderModal" tabindex="-1" role="dialog" aria-hidden="true">
+        <div class="modal-dialog modal-lg" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class=" header">Copy to new order</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">×</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-8">Copy products</div>
+                        <div class="col-4">
+                            <div class="custom-control custom-switch">
+                                <input class="custom-control-input" type="checkbox" id="copyProducts">
+                                <label class="custom-control-label" for="copyProducts"></label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-sm btn-primary" id="copyOrder" type="button" data-id="{{ order.id }}">Copy Order</button>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}
