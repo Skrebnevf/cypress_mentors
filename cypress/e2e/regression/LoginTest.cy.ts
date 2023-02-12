@@ -1,6 +1,6 @@
-import { helpers } from '../PageObject/Helpers/Helpers'
-import { URL } from '../global';
-import { loginPageObject } from '../PageObject/LoginPageObject';
+import { helpers } from '../../PageObject/Helpers/Helpers'
+import { URL } from '../../global';
+import { loginPageObject } from '../../PageObject/LoginPageObject';
 
 describe('Login Page', {testIsolation: false}, () => {
     beforeEach(() => {
@@ -20,4 +20,4 @@ describe('Login Page', {testIsolation: false}, () => {
         helpers.checkErrorsMessages('Email should be the real one!')
         loginPageObject.checkBorderColor('rgb(255, 61, 113)')
     });
-});
+}); 

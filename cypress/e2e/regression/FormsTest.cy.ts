@@ -1,7 +1,8 @@
-import { formsPage } from "../PageObject/FormsPageObject";
-import { helpers } from "../PageObject/Helpers/Helpers";
-import { navigationPage } from "../PageObject/NavigationPageObject";
-import { URL } from "../global";
+import { formsPage } from "../../PageObject/FormsPageObject"
+import { helpers } from "../../PageObject/Helpers/Helpers"
+import { navigationPage } from "../../PageObject/NavigationPageObject"
+import { URL } from "../../global"
+
 
 describe('template spec', { testIsolation: false }, () => {
 
